@@ -30,12 +30,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Print Flutter and Java versions
-        run: |
-          flutter --version
-          java -version
-
-      - name: Generate Android project and configure manifest/SDK
+      - name: Generate Android project and configure manifest/SDK/ProGuard
         working-directory: scanlite
         run: |
           flutter create --platforms=android --org com.scanlite --project-name scanlite .
@@ -56,6 +51,13 @@ jobs:
               text = text.replace("<application", perms + "    <application", 1)
           manifest.write_text(text)
 
+          Path("android/app/proguard-rules.pro").write_text(
+              "-dontwarn com.google.mlkit.vision.text.chinese.**\n"
+              "-dontwarn com.google.mlkit.vision.text.devanagari.**\n"
+              "-dontwarn com.google.mlkit.vision.text.japanese.**\n"
+              "-dontwarn com.google.mlkit.vision.text.korean.**\n"
+          )
+
           for name in ("android/app/build.gradle.kts", "android/app/build.gradle"):
               p = Path(name)
               if not p.exists():
@@ -70,6 +72,12 @@ jobs:
               g = g.replace("JavaVersion.VERSION_11", "JavaVersion.VERSION_17")
               g = g.replace("JvmTarget.JVM_11", "JvmTarget.JVM_17")
               g = g.replace("jvmTarget = \"11\"", "jvmTarget = \"17\"")
+              if "proguard-rules.pro" not in g:
+                  if name.endswith(".kts"):
+                      rule = "            proguardFiles(getDefaultProguardFile(\"proguard-android-optimize.txt\"), \"proguard-rules.pro\")\n"
+                  else:
+                      rule = "            proguardFiles getDefaultProguardFile(\x27proguard-android-optimize.txt\x27), \x27proguard-rules.pro\x27\n"
+                  g = re.sub(r"(release\s*\{\s*\n)", r"\1" + rule, g, count=1)
               p.write_text(g)
           '
 
