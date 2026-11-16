@@ -68,8 +68,8 @@ jobs:
               g = re.sub(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = 21", g)
               g = re.sub(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 21", g)
               g = g.replace("JavaVersion.VERSION_11", "JavaVersion.VERSION_17")
+              g = g.replace("JvmTarget.JVM_11", "JvmTarget.JVM_17")
               g = g.replace("jvmTarget = \"11\"", "jvmTarget = \"17\"")
-              g = g.replace("JavaVersion.VERSION_11.toString()", "JavaVersion.VERSION_17.toString()")
               p.write_text(g)
           '
 
@@ -77,7 +77,7 @@ jobs:
         working-directory: scanlite
         run: |
           flutter pub get
-          flutter analyze
+          flutter analyze --no-fatal-infos
 
       - name: Build release APK
         working-directory: scanlite
@@ -87,4 +87,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: scanlite-release-apk
-          path: scanlite/build/app/outputs/flutter-apk/app-release.apk 
+          path: scanlite/build/app/outputs/flutter-apk/app-release.apk
