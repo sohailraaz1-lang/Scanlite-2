@@ -30,34 +30,39 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Android project and configure manifest/SDK/ProGuard
+      - name: Generate fresh Android project and configure it
         working-directory: scanlite
         run: |
+          rm -rf android
           flutter create --platforms=android --org com.scanlite --project-name scanlite .
           rm -f test/widget_test.dart
-          python3 -c '
+          python3 - <<'PY'
           from pathlib import Path
           import re
 
+          # Manifest: app name + permissions
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           text = manifest.read_text()
-          text = re.sub(r"android:label=\"[^\"]+\"", "android:label=\"ScanLite\"", text, count=1)
+          text = re.sub(r'android:label="[^"]+"', 'android:label="ScanLite"', text, count=1)
           perms = ""
           if "android.permission.CAMERA" not in text:
-              perms += "    <uses-permission android:name=\"android.permission.CAMERA\" />\n"
+              perms += '    <uses-permission android:name="android.permission.CAMERA" />\n'
           if "android.permission.WRITE_EXTERNAL_STORAGE" not in text:
-              perms += "    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" android:maxSdkVersion=\"28\" />\n"
+              perms += '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n'
           if perms:
               text = text.replace("<application", perms + "    <application", 1)
           manifest.write_text(text)
 
+          # ProGuard rules for the missing ML Kit classes
           Path("android/app/proguard-rules.pro").write_text(
               "-dontwarn com.google.mlkit.vision.text.chinese.**\n"
               "-dontwarn com.google.mlkit.vision.text.devanagari.**\n"
               "-dontwarn com.google.mlkit.vision.text.japanese.**\n"
               "-dontwarn com.google.mlkit.vision.text.korean.**\n"
+              "-dontwarn com.google.mlkit.vision.text.**\n"
           )
 
+          # Gradle: SDK versions, Java 17, ProGuard file
           for name in ("android/app/build.gradle.kts", "android/app/build.gradle"):
               p = Path(name)
               if not p.exists():
@@ -71,15 +76,15 @@ jobs:
               g = re.sub(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 21", g)
               g = g.replace("JavaVersion.VERSION_11", "JavaVersion.VERSION_17")
               g = g.replace("JvmTarget.JVM_11", "JvmTarget.JVM_17")
-              g = g.replace("jvmTarget = \"11\"", "jvmTarget = \"17\"")
+              g = g.replace('jvmTarget = "11"', 'jvmTarget = "17"')
               if "proguard-rules.pro" not in g:
                   if name.endswith(".kts"):
-                      rule = "            proguardFiles(getDefaultProguardFile(\"proguard-android-optimize.txt\"), \"proguard-rules.pro\")\n"
+                      rule = '            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")\n'
                   else:
-                      rule = "            proguardFiles getDefaultProguardFile(\x27proguard-android-optimize.txt\x27), \x27proguard-rules.pro\x27\n"
-                  g = re.sub(r"(release\s*\{\s*\n)", r"\1" + rule, g, count=1)
+                      rule = "            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'\n"
+                  g = re.sub(r"(release\s*\{\s*\n)", lambda m: m.group(1) + rule, g, count=1)
               p.write_text(g)
-          '
+          PY
 
       - name: Get packages and analyze
         working-directory: scanlite
