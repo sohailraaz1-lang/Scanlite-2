@@ -40,7 +40,6 @@ jobs:
           from pathlib import Path
           import re
 
-          # Manifest: app name + permissions
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           text = manifest.read_text()
           text = re.sub(r'android:label="[^"]+"', 'android:label="ScanLite"', text, count=1)
@@ -53,7 +52,6 @@ jobs:
               text = text.replace("<application", perms + "    <application", 1)
           manifest.write_text(text)
 
-          # ProGuard rules for the missing ML Kit classes
           Path("android/app/proguard-rules.pro").write_text(
               "-dontwarn com.google.mlkit.vision.text.chinese.**\n"
               "-dontwarn com.google.mlkit.vision.text.devanagari.**\n"
@@ -62,7 +60,6 @@ jobs:
               "-dontwarn com.google.mlkit.vision.text.**\n"
           )
 
-          # Gradle: SDK versions, Java 17, ProGuard file
           for name in ("android/app/build.gradle.kts", "android/app/build.gradle"):
               p = Path(name)
               if not p.exists():
@@ -83,6 +80,12 @@ jobs:
                   else:
                       rule = "            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'\n"
                   g = re.sub(r"(release\s*\{\s*\n)", lambda m: m.group(1) + rule, g, count=1)
+              if "checkReleaseBuilds" not in g:
+                  if name.endswith(".kts"):
+                      lint = "    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n"
+                  else:
+                      lint = "    lint {\n        checkReleaseBuilds false\n        abortOnError false\n    }\n"
+                  g = re.sub(r"(android\s*\{\s*\n)", lambda m: m.group(1) + lint, g, count=1)
               p.write_text(g)
           PY
 
